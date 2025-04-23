@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=0.8">
+    <title>Quiz Nâng Cao</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        button, .option-div {
+            transition: all 0.2s ease-in-out;
+        }
+        @media (max-width: 640px) {
+            .option-div {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .option-div img {
+                margin-top: 0.5rem;
+                margin-left: 0 !important;
+            }
+        }
+        /* Thêm style để nút xóa nhỏ hơn */
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem; /* 14px */
+            line-height: 1.25rem; /* 20px */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-3xl">
+        <div id="addQuestionSection" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Thêm Câu Hỏi Mới</h2>
+            <form id="addQuestionForm" class="space-y-4">
+                <div>
+                    <label for="questionType" class="block text-sm font-medium text-gray-700">Loại câu hỏi:</label>
+                    <select id="questionType" onchange="updateQuestionForm()" class="mt-1 block w-full p-2 border rounded-md focus:ring focus:ring-blue-300">
+                        <option value="multiple">Trắc nghiệm 4 đáp án</option>
+                        <option value="truefalse">Trắc nghiệm Đúng/Sai</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="questionText" class="block text-sm font-medium text-gray-700">Câu hỏi (hỗ trợ LaTeX):</label>
+                    <textarea id="questionText" required class="mt-1 block w-full p-2 border rounded-md focus:ring focus:ring-blue-300" rows="4"></textarea>
+                </div>
+                <div>
+                    <label for="questionImage" class="block text-sm font-medium text-gray-700">Hình ảnh (tối đa 2MB):</label>
+                    <input type="file" id="questionImage" accept="image/*" onchange="previewQuestionImage(event)" class="mt-1 block w-full">
+                    <img id="questionImagePreview" class="mt-2 max-w-xs hidden">
+                </div>
+                <div id="optionsInput" class="space-y-4"></div>
+                <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700">Thêm Câu Hỏi</button>
+            </form>
+            <div class="mt-4 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+                <button onclick="saveQuestions()" class="bg-green-600 text-white p-2 rounded-md hover:bg-green-700">Lưu Câu Hỏi</button>
+                <label class="bg-yellow-500 text-white p-2 rounded-md hover:bg-yellow-600 cursor-pointer text-center">
+                    Tải Câu Hỏi
+                    <input type="file" id="loadQuestions" accept=".json" onchange="handleFileLoad(event)" class="hidden">
+                </label>
+                <button id="showQuestionListBtn" onclick="showQuestionList()" class="bg-purple-600 text-white p-2 rounded-md hover:bg-purple-700">Danh Sách Câu Hỏi</button>
+                <button id="startQuizBtn" onclick="startQuiz()" class="bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700">Bắt đầu Quiz</button>
+            </div>
+        </div>
+
+        <div id="questionListSection" class="bg-white rounded-lg shadow-lg p-6 mb-6 hidden">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Danh Sách Câu Hỏi</h2>
+            <div id="questionButtons" class="space-y-2 max-h-96 overflow-y-auto pr-2">
+                </div>
+            <div id="editQuestionForm" class="mt-6 hidden">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Chỉnh Sửa Câu Hỏi</h3>
+                <form id="editForm" class="space-y-4">
+                    <div>
+                        <label for="editQuestionType" class="block text-sm font-medium text-gray-700">Loại câu hỏi:</label>
+                        <select id="editQuestionType" onchange="updateEditQuestionForm()" class="mt-1 block w-full p-2 border rounded-md focus:ring focus:ring-blue-300">
+                            <option value="multiple">Trắc nghiệm 4 đáp án</option>
+                            <option value="truefalse">Trắc nghiệm Đúng/Sai</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="editQuestionText" class="block text-sm font-medium text-gray-700">Câu hỏi (hỗ trợ LaTeX):</label>
+                        <textarea id="editQuestionText" required class="mt-1 block w-full p-2 border rounded-md focus:ring focus:ring-blue-300" rows="4"></textarea>
+                    </div>
+                    <div>
+                        <label for="editQuestionImage" class="block text-sm font-medium text-gray-700">Hình ảnh (tối đa 2MB):</label>
+                        <input type="file" id="editQuestionImage" accept="image/*" onchange="previewEditQuestionImage(event)" class="mt-1 block w-full">
+                        <img id="editQuestionImagePreview" class="mt-2 max-w-xs hidden">
+                    </div>
+                    <div id="editOptionsInput" class="space-y-4"></div>
+                    <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+                        <button type="submit" class="w-full sm:w-1/2 bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700">Lưu Thay Đổi</button>
+                        <button type="button" onclick="cancelEdit()" class="w-full sm:w-1/2 bg-gray-600 text-white p-2 rounded-md hover:bg-gray-700">Hủy</button>
+                    </div>
+                </form>
+            </div>
+            <button onclick="backToAddQuestionFromList()" class="mt-4 w-full bg-gray-600 text-white p-2 rounded-md hover:bg-gray-700">Quay Lại</button>
+        </div>
+
+        <div id="quizSection" class="bg-white rounded-lg shadow-lg p-6 hidden relative">
+            <button onclick="backToAddQuestion()" class="absolute top-2 right-2 bg-gray-600 text-white p-1 rounded-md hover:bg-gray-700 text-sm z-10">Home</button>
+            <h2 id="question" class="text-lg font-semibold text-gray-800"></h2>
+            <img id="questionImageDisplay" class="max-w-xs my-4 hidden">
+            <div id="options" class="space-y-2"></div>
+            <div id="feedback" class="mt-4 font-bold"></div>
+            <div class="mt-4 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+                <button id="nextBtn" disabled class="w-full sm:w-1/2 bg-blue-600 text-white p-2 rounded-md opacity-50 cursor-not-allowed hidden">Tiếp theo</button>
+                <button id="restartDuringQuizBtn" onclick="restartQuiz()" class="w-full sm:w-1/2 bg-yellow-500 text-white p-2 rounded-md hover:bg-yellow-600 hidden">Bắt đầu lại</button>
+            </div>
+            <div id="result" class="mt-4 hidden">
+                <p id="score" class="text-lg font-bold"></p>
+                <button onclick="restartQuiz()" class="mt-2 w-full bg-purple-600 text-white p-2 rounded-md hover:bg-purple-700">Làm Lại</button>
+                <button onclick="backToAddQuestion()" class="mt-2 w-full bg-gray-600 text-white p-2 rounded-md hover:bg-gray-700">Quay Lại</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let quizData = [];
+        let currentQuestion = 0;
+        let correctAnswers = 0;
+        let questionOrder = [];
+        let currentQuizData = [];
+        let firstAttemptCorrect = true;
+        let editingIndex = -1;
+
+        const questionEl = document.getElementById("question");
+        const questionImageDisplay = document.getElementById("questionImageDisplay");
+        const optionsEl = document.getElementById("options");
+        const feedbackEl = document.getElementById("feedback");
+        const nextBtn = document.getElementById("nextBtn");
+        const resultEl = document.getElementById("result");
+        const scoreEl = document.getElementById("score");
+        const quizSection = document.getElementById("quizSection");
+        const addQuestionSection = document.getElementById("addQuestionSection");
+        const questionListSection = document.getElementById("questionListSection");
+        const startQuizBtn = document.getElementById("startQuizBtn");
+        const questionButtons = document.getElementById("questionButtons");
+        const editQuestionForm = document.getElementById("editQuestionForm");
+        const restartDuringQuizBtn = document.getElementById("restartDuringQuizBtn");
+
+        // Cập nhật giao diện form thêm/sửa câu hỏi dựa trên loại
+        function updateQuestionForm() {
+            const type = document.getElementById("questionType").value;
+            const optionsInput = document.getElementById("optionsInput");
+            optionsInput.innerHTML = "";
+            if (type === "multiple") {
+                for (let i = 0; i < 4; i++) {
+                    optionsInput.innerHTML += `
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
+                            <textarea class="option-text flex-1 p-2 border rounded-md" placeholder="Đáp án ${i + 1}" required rows="2"></textarea>
+                            <input type="radio" name="correct" value="${i}" ${i === 0 ? "required" : ""}>
+                            <label class="text-sm cursor-pointer bg-gray-200 p-1 rounded">Ảnh
+                               <input type="file" class="option-image hidden" accept="image/*" onchange="previewOptionImage(${i}, event)">
+                            </label>
+                            <img class="option-image-preview max-w-[60px] hidden ml-1" id="optionImagePreview${i}">
+                        </div>
+                    `;
+                }
+            } else { // truefalse
+                optionsInput.innerHTML = `
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
+                        <textarea class="option-text flex-1 p-2 border rounded-md" readonly rows="1">Đúng</textarea>
+                        <input type="radio" name="correct" value="0" required>
+                         <label class="text-sm cursor-pointer bg-gray-200 p-1 rounded">Ảnh
+                            <input type="file" class="option-image hidden" accept="image/*" onchange="previewOptionImage(0, event)">
+                         </label>
+                         <img class="option-image-preview max-w-[60px] hidden ml-1" id="optionImagePreview0">
+                    </div>
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
+                        <textarea class="option-text flex-1 p-2 border rounded-md" readonly rows="1">Sai</textarea>
+                        <input type="radio" name="correct" value="1">
+                        <label class="text-sm cursor-pointer bg-gray-200 p-1 rounded">Ảnh
+                           <input type="file" class="option-image hidden" accept="image/*" onchange="previewOptionImage(1, event)">
+                        </label>
+                        <img class="option-image-preview max-w-[60px] hidden ml-1" id="optionImagePreview1">
+                    </div>
+                `;
+            }
+        }
+
+        // Cập nhật form chỉnh sửa
+        function updateEditQuestionForm() {
+            const type = document.getElementById("editQuestionType").value;
+            const optionsInput = document.getElementById("editOptionsInput");
+            optionsInput.innerHTML = "";
+            if (type === "multiple") {
+                for (let i = 0; i < 4; i++) {
+                    optionsInput.innerHTML += `
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
+                            <textarea class="edit-option-text flex-1 p-2 border rounded-md" placeholder="Đáp án ${i + 1}" required rows="2"></textarea>
+                            <input type="radio" name="editCorrect" value="${i}" ${i === 0 ? "required" : ""}>
+                             <label class="text-sm cursor-pointer bg-gray-200 p-1 rounded">Ảnh
+                                <input type="file" class="edit-option-image hidden" accept="image/*" onchange="previewEditOptionImage(${i}, event)">
+                             </label>
+                             <img class="edit-option-image-preview max-w-[60px] hidden ml-1" id="editOptionImagePreview${i}">
+                        </div>
+                    `;
+                }
+            } else { // truefalse
+                 optionsInput.innerHTML = `
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
+                        <textarea class="edit-option-text flex-1 p-2 border rounded-md" readonly rows="1">Đúng</textarea>
+                        <input type="radio" name="editCorrect" value="0" required>
+                         <label class="text-sm cursor-pointer bg-gray-200 p-1 rounded">Ảnh
+                             <input type="file" class="edit-option-image hidden" accept="image/*" onchange="previewEditOptionImage(0, event)">
+                         </label>
+                         <img class="edit-option-image-preview max-w-[60px] hidden ml-1" id="editOptionImagePreview0">
+                    </div>
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
+                        <textarea class="edit-option-text flex-1 p-2 border rounded-md" readonly rows="1">Sai</textarea>
+                        <input type="radio" name="editCorrect" value="1">
+                         <label class="text-sm cursor-pointer bg-gray-200 p-1 rounded">Ảnh
+                            <input type="file" class="edit-option-image hidden" accept="image/*" onchange="previewEditOptionImage(1, event)">
+                         </label>
+                        <img class="edit-option-image-preview max-w-[60px] hidden ml-1" id="editOptionImagePreview1">
+                    </div>
+                `;
+            }
+            // Nếu đang edit, điền lại dữ liệu sau khi cấu trúc form thay đổi
+            if (editingIndex !== -1) {
+                populateEditForm(editingIndex);
+            }
+        }
+
+        // Xem trước ảnh câu hỏi
+        function previewImage(event, previewElementId) {
+             const file = event.target.files[0];
+             if (file && file.size > 2 * 1024 * 1024) {
+                 alert("Hình ảnh quá lớn. Vui lòng chọn hình ảnh nhỏ hơn 2MB.");
+                 event.target.value = ""; // Reset input
+                 return;
+             }
+             const preview = document.getElementById(previewElementId);
+             if (file) {
+                 preview.src = URL.createObjectURL(file);
+                 preview.classList.remove("hidden");
+             } else {
+                 preview.src = "";
+                 preview.classList.add("hidden");
+             }
+        }
+
+        function previewQuestionImage(event) { previewImage(event, 'questionImagePreview'); }
+        function previewOptionImage(index, event) { previewImage(event, `optionImagePreview${index}`); }
+        function previewEditQuestionImage(event) { previewImage(event, 'editQuestionImagePreview'); }
+        function previewEditOptionImage(index, event) { previewImage(event, `editOptionImagePreview${index}`); }
+
+        // Hiển thị danh sách câu hỏi
+        function showQuestionList() {
+            addQuestionSection.classList.add("hidden");
+            questionListSection.classList.remove("hidden");
+            editQuestionForm.classList.add("hidden"); // Ẩn form edit khi mới vào list
+            updateQuestionButtons();
+        }
+
+        // !!! THAY ĐỔI 2: Cập nhật danh sách câu hỏi với nút Sửa và Xóa
+        function updateQuestionButtons() {
+             questionButtons.innerHTML = quizData.length > 0 ? quizData.map((q, index) => `
+                 <div class="flex items-center justify-between p-2 bg-gray-50 border rounded-md mb-2 hover:bg-gray-100">
+                     <span class="flex-1 mr-2 truncate text-sm">Câu ${index + 1}: ${q.question.replace(/<[^>]*>?/gm, '').substring(0, 60)}${q.question.length > 60 ? '...' : ''}</span>
+                     <div class="flex-shrink-0">
+                         <button onclick="editQuestion(${index})" class="bg-yellow-500 text-white btn-sm rounded-md hover:bg-yellow-600 mr-1">Sửa</button>
+                         <button onclick="deleteQuestion(${index})" class="bg-red-600 text-white btn-sm rounded-md hover:bg-red-700">Xóa</button>
+                     </div>
+                 </div>
+             `).join("") : "<p class='text-gray-600 text-center'>Chưa có câu hỏi nào.</p>";
+             // Cập nhật lại trạng thái nút Bắt đầu Quiz sau khi cập nhật danh sách
+             showStartButton();
+        }
+
+        // Mở form chỉnh sửa câu hỏi
+        function editQuestion(index) {
+            editingIndex = index;
+            const q = quizData[index];
+            document.getElementById("editQuestionType").value = q.type;
+            updateEditQuestionForm(); // Gọi trước để tạo đúng cấu trúc input
+            populateEditForm(index); // Điền dữ liệu vào form đã có cấu trúc
+            editQuestionForm.classList.remove("hidden");
+            editQuestionForm.scrollIntoView({ behavior: 'smooth' }); // Cuộn tới form edit
+        }
+
+        // Điền dữ liệu vào form chỉnh sửa
+        function populateEditForm(index) {
+            const q = quizData[index];
+            document.getElementById("editQuestionText").value = q.question;
+            // Ảnh câu hỏi
+            const questionPreview = document.getElementById("editQuestionImagePreview");
+            const questionImageInput = document.getElementById("editQuestionImage");
+            questionImageInput.value = ""; // Reset input file
+            if (q.questionImage) {
+                questionPreview.src = q.questionImage;
+                questionPreview.classList.remove("hidden");
+            } else {
+                questionPreview.classList.add("hidden");
+            }
+            // Ảnh và text đáp án
+            const optionInputs = document.querySelectorAll(".edit-option-text");
+            const radios = document.querySelectorAll('input[name="editCorrect"]');
+            const imageInputs = document.querySelectorAll(".edit-option-image");
+            const imagePreviews = document.querySelectorAll(".edit-option-image-preview");
+
+            q.options.forEach((opt, i) => {
+                if(optionInputs[i]) optionInputs[i].value = opt;
+                if(radios[i]) radios[i].checked = (opt === q.correct || String(i) === q.correctIndex); // Handle old/new correct format
+
+                if(imageInputs[i]) imageInputs[i].value = ""; // Reset input file
+                if(imagePreviews[i]) {
+                    if (q.optionImages[i]) {
+                        imagePreviews[i].src = q.optionImages[i];
+                        imagePreviews[i].classList.remove("hidden");
+                    } else {
+                        imagePreviews[i].classList.add("hidden");
+                    }
+                }
+            });
+             // Đảm bảo radio được check đúng
+            const correctIndex = q.options.findIndex(opt => opt === q.correct);
+             if(correctIndex !== -1 && radios[correctIndex]) {
+                 radios[correctIndex].checked = true;
+             } else if (q.type === 'truefalse' && radios[q.correctIndex]) { // Handle true/false index case
+                 radios[q.correctIndex].checked = true;
+             }
+        }
+
+        // Hủy chỉnh sửa
+        function cancelEdit() {
+            editQuestionForm.classList.add("hidden");
+            editingIndex = -1;
+            document.getElementById("editForm").reset();
+            // Ẩn các preview ảnh
+            document.getElementById("editQuestionImagePreview").classList.add("hidden");
+            document.querySelectorAll(".edit-option-image-preview").forEach(p => p.classList.add("hidden"));
+            // Reset giá trị file input
+             document.getElementById("editQuestionImage").value = "";
+             document.querySelectorAll(".edit-option-image").forEach(input => input.value = "");
+        }
+
+        // Quay lại màn hình chính từ danh sách
+        function backToAddQuestionFromList() {
+            questionListSection.classList.add("hidden");
+            addQuestionSection.classList.remove("hidden");
+            cancelEdit(); // Đảm bảo form edit bị hủy khi quay lại
+        }
+
+        // Xử lý lưu thay đổi khi chỉnh sửa
+        document.getElementById("editForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            if (editingIndex === -1) return;
+
+            const type = document.getElementById("editQuestionType").value;
+            const questionText = document.getElementById("editQuestionText").value;
+            const questionImageInput = document.getElementById("editQuestionImage");
+            const optionInputs = document.querySelectorAll(".edit-option-text");
+            const correctRadio = document.querySelector('input[name="editCorrect"]:checked');
+            const optionImageInputs = document.querySelectorAll(".edit-option-image");
+
+            if (!correctRadio) return alert("Vui lòng chọn đáp án đúng!");
+            const options = Array.from(optionInputs).map(input => input.value);
+            if (options.some(opt => !opt.trim())) return alert("Vui lòng điền đầy đủ các ô đáp án!");
+            if (type === "multiple" && new Set(options).size !== options.length) return alert("Các đáp án không được trùng nhau!");
+
+            let questionImage = quizData[editingIndex].questionImage; // Giữ ảnh cũ mặc định
+            if (questionImageInput.files[0]) {
+                if (questionImageInput.files[0].size > 2 * 1024 * 1024) return alert("Hình ảnh câu hỏi quá lớn!");
+                questionImage = await fileToBase64(questionImageInput.files[0]);
+            } else if (!questionImage) { // Nếu không có file mới và không có ảnh cũ -> rỗng
+                 questionImage = "";
+            }
+
+            const originalOptionImages = quizData[editingIndex].optionImages || [];
+            const optionImages = await Promise.all(
+                 Array.from(optionImageInputs).map(async (input, i) => {
+                     if (input.files[0]) {
+                         if (input.files[0].size > 2 * 1024 * 1024) {
+                            alert(`Hình ảnh đáp án ${i+1} quá lớn! Sẽ giữ ảnh cũ (nếu có).`);
+                            return originalOptionImages[i] || ""; // Giữ ảnh cũ nếu file mới quá lớn
+                         }
+                         return await fileToBase64(input.files[0]);
+                     }
+                     return originalOptionImages[i] || ""; // Giữ ảnh cũ nếu không chọn file mới
+                 })
+            );
+
+            quizData[editingIndex] = {
+                question: questionText,
+                options,
+                correct: options[correctRadio.value], // Lưu text của đáp án đúng
+                type,
+                questionImage,
+                optionImages
+            };
+            updateQuestionButtons(); // Cập nhật lại danh sách hiển thị
+            cancelEdit(); // Đóng và reset form edit
+            alert("Đã cập nhật câu hỏi!");
+        });
+
+        // Xáo trộn mảng
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // Khởi tạo quiz
+        function initializeQuiz() {
+             if (quizData.length === 0) {
+                 alert("Không có câu hỏi nào để bắt đầu quiz!");
+                 showStartButton(); // Đảm bảo nút Start bị ẩn nếu không có câu hỏi
+                 return; // Không làm gì nếu không có câu hỏi
+             }
+            questionOrder = shuffleArray([...Array(quizData.length).keys()]);
+            currentQuizData = questionOrder.map(index => {
+                const q = JSON.parse(JSON.stringify(quizData[index])); // Deep copy để tránh thay đổi quizData gốc
+                const optionsWithImages = q.options.map((opt, i) => ({
+                    text: opt,
+                    image: (q.optionImages && q.optionImages[i]) ? q.optionImages[i] : ""
+                }));
+
+                // Tìm index của đáp án đúng TRƯỚC KHI xáo trộn
+                const correctText = q.correct;
+                let originalCorrectIndex = q.options.indexOf(correctText);
+                 // Fallback cho true/false nếu chỉ lưu index 0/1
+                 if (originalCorrectIndex === -1 && q.type === 'truefalse' && (correctText === '0' || correctText === '1')) {
+                    originalCorrectIndex = parseInt(correctText, 10);
+                 }
+
+                const shuffledOptions = shuffleArray(optionsWithImages); // Xáo trộn cả text và ảnh cùng nhau
+                q.options = shuffledOptions.map(opt => opt.text);
+                q.optionImages = shuffledOptions.map(opt => opt.image);
+                // Tìm index mới của đáp án đúng SAU KHI xáo trộn
+                q.correctIndex = q.options.indexOf(correctText);
+                 // Nếu không tìm thấy (có thể do lỗi dữ liệu), đánh dấu sai hoặc xử lý khác
+                 if (q.correctIndex === -1) {
+                     console.error("Không tìm thấy đáp án đúng sau khi xáo trộn:", correctText, q.options);
+                     q.correctIndex = 0; // Hoặc một giá trị mặc định an toàn
+                 }
+                 // Lưu lại text đúng để so sánh khi chọn
+                 q.correct = correctText;
+                return q;
+            });
+            currentQuestion = 0;
+            correctAnswers = 0;
+            addQuestionSection.classList.add("hidden");
+            questionListSection.classList.add("hidden");
+            quizSection.classList.remove("hidden");
+            loadQuestion();
+        }
+
+        // Tải câu hỏi lên giao diện quiz
+        function loadQuestion() {
+            resultEl.classList.add("hidden");
+            nextBtn.classList.remove("hidden");
+            restartDuringQuizBtn.classList.remove("hidden");
+            firstAttemptCorrect = true;
+
+            if (currentQuizData.length === 0 || currentQuestion >= currentQuizData.length) {
+                 // Hiển thị kết quả nếu không còn câu hỏi
+                 showResult();
+                 return;
+             }
+
+            const q = currentQuizData[currentQuestion];
+            questionEl.innerHTML = q.question.replace(/\n/g, '<br>'); // Hiển thị câu hỏi, chuyển \n thành <br>
+            questionImageDisplay.classList.toggle("hidden", !q.questionImage);
+            if (q.questionImage) questionImageDisplay.src = q.questionImage;
+
+            optionsEl.innerHTML = "";
+            feedbackEl.textContent = "";
+            nextBtn.disabled = true;
+            nextBtn.classList.add("opacity-50", "cursor-not-allowed");
+            nextBtn.classList.remove("bg-green-600", "hover:bg-green-700"); // Reset màu nút next
+
+            q.options.forEach((option, index) => {
+                const div = document.createElement("div");
+                // !!! THAY ĐỔI 3: Sử dụng items-start thay vì items-center
+                div.classList.add("option-div", "p-3", "bg-gray-50", "border", "rounded-md", "cursor-pointer", "hover:bg-gray-100", "flex", "items-start", "space-x-2"); // items-start để căn trên-trái
+                let optionHTML = `<span class="flex-grow">${option.replace(/\n/g, '<br>')}</span>`; // Cho text chiếm không gian
+                if (q.optionImages?.[index]) {
+                    optionHTML += `<img src="${q.optionImages[index]}" class="max-w-[80px] ml-auto flex-shrink-0">`; // Ảnh co lại nếu cần
+                }
+                div.innerHTML = optionHTML;
+                div.addEventListener("click", () => selectOption(option, div, q.correctIndex)); // Truyền index đúng vào
+                optionsEl.appendChild(div);
+            });
+
+             // Render LaTeX nếu có
+            if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
+                MathJax.typesetPromise([questionEl, optionsEl]).catch(function (err) {
+                    console.error('MathJax typesetting error:', err);
+                });
+            } else if (typeof MathJax !== 'undefined' && MathJax.Hub) { // Fallback cho MathJax v2
+                 MathJax.Hub.Queue(["Typeset", MathJax.Hub, questionEl]);
+                 MathJax.Hub.Queue(["Typeset", MathJax.Hub, optionsEl]);
+            }
+        }
+
+        // Xử lý khi chọn đáp án
+        function selectOption(selectedText, selectedDiv, correctIndex) {
+            const q = currentQuizData[currentQuestion];
+            const optionsDivs = optionsEl.querySelectorAll(".option-div");
+            optionsDivs.forEach(optDiv => {
+                optDiv.style.pointerEvents = 'none'; // Vô hiệu hóa click sau khi chọn
+                optDiv.classList.remove("bg-green-100", "border-green-400", "bg-red-100", "border-red-400", "hover:bg-gray-100"); // Reset style
+            });
+
+             const isCorrect = (selectedText === q.correct);
+
+            if (isCorrect) {
+                feedbackEl.textContent = "Đúng!";
+                feedbackEl.className = "mt-4 font-bold text-green-600";
+                selectedDiv.classList.add("bg-green-100", "border-green-400");
+                if (firstAttemptCorrect) {
+                     correctAnswers++;
+                     nextBtn.classList.add("bg-green-600", "hover:bg-green-700"); // Đổi màu nút Next khi đúng lần đầu
+                 } else {
+                     nextBtn.classList.add("bg-yellow-500", "hover:bg-yellow-600"); // Màu vàng nếu đúng sau khi sai
+                 }
+            } else {
+                feedbackEl.textContent = `Sai! Đáp án đúng là: ${q.correct.replace(/\n/g,'<br>')}`;
+                feedbackEl.className = "mt-4 font-bold text-red-600";
+                selectedDiv.classList.add("bg-red-100", "border-red-400");
+                // Highlight đáp án đúng
+                 if (optionsDivs[q.correctIndex]) {
+                     optionsDivs[q.correctIndex].classList.add("bg-green-100", "border-green-400");
+                 }
+                firstAttemptCorrect = false;
+                nextBtn.classList.add("bg-red-600", "hover:bg-red-700"); // Màu đỏ khi sai
+            }
+             nextBtn.disabled = false;
+             nextBtn.classList.remove("opacity-50", "cursor-not-allowed");
+        }
+
+        // Chuyển câu hỏi tiếp theo hoặc hiển thị kết quả
+        nextBtn.addEventListener("click", () => {
+            currentQuestion++;
+            if (currentQuestion < currentQuizData.length) {
+                loadQuestion();
+            } else {
+                showResult();
+            }
+        });
+
+        // Hiển thị kết quả cuối cùng
+         function showResult() {
+             questionEl.textContent = "";
+             optionsEl.innerHTML = "";
+             feedbackEl.textContent = "";
+             questionImageDisplay.classList.add("hidden");
+             nextBtn.classList.add("hidden");
+             restartDuringQuizBtn.classList.add("hidden");
+             scoreEl.textContent = `Bạn đúng ${correctAnswers}/${currentQuizData.length} câu!`;
+             resultEl.classList.remove("hidden");
+         }
+
+        // Chơi lại quiz
+        function restartQuiz() {
+            initializeQuiz(); // Bắt đầu lại từ đầu
+        }
+
+        // Quay lại màn hình chính từ quiz/kết quả
+        function backToAddQuestion() {
+            quizSection.classList.add("hidden");
+            addQuestionSection.classList.remove("hidden");
+            // Không reset quizData ở đây, chỉ reset trạng thái hiển thị
+            document.getElementById("loadQuestions").value = ""; // Reset input file
+            updateQuestionButtons(); // Cập nhật lại list phòng trường hợp có thay đổi
+            showStartButton(); // Cập nhật nút start
+        }
+
+        // !!! THAY ĐỔI 1: Cập nhật trạng thái nút "Bắt đầu Quiz"
+        function showStartButton() {
+            // Nút chỉ hiển thị khi có câu hỏi trong quizData
+            startQuizBtn.classList.toggle("hidden", quizData.length === 0);
+        }
+
+        // Xử lý khi chọn file JSON
+        function handleFileLoad(event) {
+            const fileInput = event.target;
+            if (fileInput.files[0]) {
+                 loadQuestionsFromFile(fileInput);
+            } else {
+                 showStartButton(); // Cập nhật nút start nếu hủy chọn file
+            }
+        }
+
+
+        // Bắt đầu quiz (từ nút bấm)
+        function startQuiz() {
+            // Không cần load lại file ở đây nữa vì đã load khi chọn file
+            if (quizData.length > 0) {
+                initializeQuiz();
+            } else {
+                 alert("Vui lòng thêm câu hỏi hoặc tải file câu hỏi trước khi bắt đầu!");
+            }
+        }
+
+        // Chuyển file sang Base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Xử lý thêm câu hỏi mới
+        document.getElementById("addQuestionForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const type = document.getElementById("questionType").value;
+            const questionText = document.getElementById("questionText").value;
+            const questionImageInput = document.getElementById("questionImage");
+            const optionInputs = document.querySelectorAll(".option-text");
+            const correctRadio = document.querySelector('input[name="correct"]:checked');
+            const optionImageInputs = document.querySelectorAll(".option-image");
+
+            if (!correctRadio) return alert("Vui lòng chọn đáp án đúng!");
+            const options = Array.from(optionInputs).map(input => input.value);
+            if (options.some(opt => !opt.trim())) return alert("Vui lòng điền đầy đủ các ô đáp án!");
+             // Chỉ kiểm tra trùng với multiple choice
+            if (type === "multiple") {
+                const uniqueOptions = new Set(options.map(opt => opt.trim())); // Trim trước khi kiểm tra
+                if (uniqueOptions.size !== options.length) {
+                     return alert("Các đáp án trong câu hỏi trắc nghiệm không được trùng nhau!");
+                 }
+             }
+
+            let questionImage = "";
+            if (questionImageInput.files[0]) {
+                if (questionImageInput.files[0].size > 2 * 1024 * 1024) return alert("Hình ảnh câu hỏi quá lớn!");
+                questionImage = await fileToBase64(questionImageInput.files[0]);
+            }
+
+            const optionImages = await Promise.all(
+                Array.from(optionImageInputs).map(async (input, i) => {
+                    if (input.files[0]) {
+                         if (input.files[0].size > 2 * 1024 * 1024) {
+                            alert(`Hình ảnh đáp án ${i+1} quá lớn! Sẽ bỏ qua ảnh này.`);
+                            input.value = ""; // Reset input nếu ảnh quá lớn
+                            document.getElementById(`optionImagePreview${i}`).classList.add('hidden');
+                            return "";
+                         }
+                        return await fileToBase64(input.files[0]);
+                    }
+                    return ""; // Trả về chuỗi rỗng nếu không có file
+                })
+            );
+
+
+            quizData.push({
+                question: questionText,
+                options,
+                correct: options[correctRadio.value], // Lưu text của đáp án đúng
+                type,
+                questionImage,
+                optionImages
+            });
+
+            alert("Đã thêm câu hỏi!");
+            document.getElementById("addQuestionForm").reset();
+            document.getElementById("questionImagePreview").classList.add("hidden");
+            // Reset các ảnh preview của option
+             document.querySelectorAll(".option-image-preview").forEach(img => img.classList.add('hidden'));
+            updateQuestionForm(); // Reset form về trạng thái ban đầu (multiple choice)
+            showStartButton(); // !!! THAY ĐỔI 1: Cập nhật nút Bắt đầu Quiz sau khi thêm
+        });
+
+        // !!! THAY ĐỔI 2: Hàm xóa câu hỏi
+        function deleteQuestion(index) {
+             if (index < 0 || index >= quizData.length) {
+                 console.error("Invalid index for deletion:", index);
+                 return;
+             }
+             const questionText = quizData[index].question.substring(0, 50) + (quizData[index].question.length > 50 ? '...' : '');
+             if (confirm(`Bạn có chắc muốn xóa câu hỏi "${questionText}"?`)) {
+                 // Nếu câu hỏi đang được sửa bị xóa, hủy trạng thái sửa
+                 if (editingIndex === index) {
+                     cancelEdit();
+                 }
+
+                 quizData.splice(index, 1);
+
+                 // Nếu index đang sửa lớn hơn index bị xóa, giảm nó đi 1
+                 if (editingIndex > index) {
+                     editingIndex--;
+                 }
+
+                 updateQuestionButtons(); // Cập nhật lại danh sách hiển thị
+                 showStartButton(); // Cập nhật trạng thái nút bắt đầu quiz
+                 alert("Đã xóa câu hỏi.");
+                 // Lưu ý: Thay đổi này chỉ ở bộ nhớ, cần bấm "Lưu Câu Hỏi" để lưu vào file
+             }
+        }
+
+
+        // Lưu câu hỏi vào file JSON
+        function saveQuestions() {
+            const blob = new Blob([JSON.stringify(quizData, null, 2)], { type: "application/json" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "quiz_data.json";
+            a.click();
+        }
+
+
+        // Tải câu hỏi từ file JSON
+        function loadQuestionsFromFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const loadedData = JSON.parse(e.target.result);
+                    if (Array.isArray(loadedData)) {
+                         // Đơn giản là gán đè dữ liệu cũ
+                         quizData = loadedData;
+                         alert(`Đã tải thành công ${quizData.length} câu hỏi. Dữ liệu cũ đã bị ghi đè.`);
+                         updateQuestionButtons(); // Cập nhật danh sách hiển thị
+                         showStartButton(); // !!! THAY ĐỔI 1: Cập nhật nút start sau khi load file
+                         // Không tự động bắt đầu quiz ở đây, để người dùng bấm nút
+                    } else {
+                         alert("File JSON không hợp lệ (không phải là một mảng câu hỏi).");
+                         input.value = ""; // Reset input file
+                    }
+                } catch (error) {
+                    alert("Lỗi khi đọc hoặc phân tích file JSON: " + error.message);
+                    console.error("JSON parsing error:", error);
+                     input.value = ""; // Reset input file
+                }
+            };
+             reader.onerror = (e) => {
+                 alert("Lỗi khi đọc file.");
+                 console.error("File reading error:", e);
+                 input.value = ""; // Reset input file
+             }
+            reader.readAsText(file);
+        }
+
+        // Khởi tạo ban đầu
+        updateQuestionForm(); // Đặt form thêm câu hỏi ở trạng thái mặc định
+        showStartButton(); // !!! THAY ĐỔI 1: Gọi lần đầu để ẩn/hiện nút tùy vào quizData (mặc định là [])
+
+    </script>
+</body>
+</html>
